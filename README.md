@@ -12,13 +12,21 @@ The Visitor Log System is a simple application developed as part of an Applicati
 
 ### Add Visitor
 ![Add Visitor](1.%20Add%20Visitor.png)
+
+### Add Visitor (DB)
 ![Add Visitor (DB)](1.%20Add%20Visitor%20(DB).png)
 
 ### Update Visitor
 ![Update Visitor](1.%20Update%20Visitor.png)
+
+### Update Visitor (DB)
 ![Update Visitor (DB)](1.%20Update%20Visitor%20(DB).png)
 
-### Delete Visitor
+### Delete Visitor Confirmation
 ![Delete Visitor Confirmation](1.%20Delete%20Visitor%20Confirmation.png)
+
+### Deleted Visitor
 ![Deleted Visitor](1.%20Deleted%20Visitor.png)
+
+### Deleted Visitor (DB)
 ![Deleted Visitor (DB)](1.%20Deleted%20Visitor%20(DB).png)
