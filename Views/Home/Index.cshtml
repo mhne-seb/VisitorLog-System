@@ -1,0 +1,424 @@
+@model List<Visitor>
+@{
+    ViewData["Title"] = "Dashboard";
+    var search = ViewBag.Search as string ?? "";
+}
+
+@section Scripts {
+<script>
+    // ── Auto-dismiss alerts ──────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+        const alerts = document.querySelectorAll('.auto-dismiss');
+        alerts.forEach(a => setTimeout(() => {
+            a.style.transition = 'opacity .4s';
+            a.style.opacity = '0';
+            setTimeout(() => a.remove(), 400);
+        }, 4000));
+
+        // Animate rows on load
+        document.querySelectorAll('.table-row-fade').forEach((row, i) => {
+            row.style.opacity = '0';
+            row.style.transform = 'translateY(10px)';
+            row.style.transition = `opacity .3s ${i * 0.04}s, transform .3s ${i * 0.04}s`;
+            setTimeout(() => {
+                row.style.opacity = '1';
+                row.style.transform = 'translateY(0)';
+            }, 60);
+        });
+    });
+
+    // ── Load visitor data into edit modal ───────────────────────────────────
+    async function openEditModal(id) {
+        try {
+            const res = await fetch(`/Home/GetVisitor?id=${id}`);
+            if (!res.ok) throw new Error('Not found');
+            const v = await res.json();
+
+            document.getElementById('edit_Id').value          = v.id;
+            document.getElementById('edit_FullName').value    = v.fullName;
+            document.getElementById('edit_Purpose').value     = v.purposeOfVisit;
+            document.getElementById('edit_Person').value      = v.personToVisit;
+            document.getElementById('edit_Contact').value     = v.contactNumber;
+            document.getElementById('edit_DateTime').value    = v.dateTimeVisited;
+
+            new bootstrap.Modal(document.getElementById('editModal')).show();
+        } catch {
+            alert('Could not load visitor details. Please try again.');
+        }
+    }
+
+    // ── Delete confirmation modal ────────────────────────────────────────────
+    let deleteId = null;
+
+    function confirmDelete(id, name) {
+        deleteId = id;
+        document.getElementById('deleteVisitorName').textContent = name;
+        new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    }
+
+    function submitDelete() {
+        if (!deleteId) return;
+        document.getElementById('deleteId').value = deleteId;
+        document.getElementById('deleteForm').submit();
+    }
+
+    // ── Clear add form ───────────────────────────────────────────────────────
+    function clearForm() {
+        document.getElementById('addForm').reset();
+        document.querySelectorAll('#addForm .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    }
+
+    // ── Live search (submit on Enter or button) ──────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', e => {
+                if (e.key === 'Enter') document.getElementById('searchForm').submit();
+            });
+        }
+    });
+</script>
+}
+
+<!-- ══════════════════════════════════════════════════════
+     ALERT BANNERS
+══════════════════════════════════════════════════════ -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert-custom alert-success-custom auto-dismiss fade-up mb-3"
+         style="border-radius:10px; padding:.85rem 1.1rem; font-size:.85rem; font-weight:500; display:flex; align-items:center; gap:.65rem; background:#d1fae5; color:#065f46;">
+        <i class="bi bi-check-circle-fill fs-5"></i>
+        <span>@Html.Raw(TempData["Success"])</span>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert-custom alert-error-custom auto-dismiss fade-up mb-3"
+         style="border-radius:10px; padding:.85rem 1.1rem; font-size:.85rem; font-weight:500; display:flex; align-items:center; gap:.65rem; background:#fee2e2; color:#991b1b;">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <span>@Html.Raw(TempData["Error"])</span>
+    </div>
+}
+
+<!-- ══════════════════════════════════════════════════════
+     TOP SECTION — ADD VISITOR FORM
+══════════════════════════════════════════════════════ -->
+<div class="panel-card fade-up">
+    <div class="panel-header">
+        <div class="panel-header-icon blue">
+            <i class="bi bi-person-plus-fill"></i>
+        </div>
+        <div>
+            <h5>Add New Visitor</h5>
+            <span>Fill in the visitor details below and click Save</span>
+        </div>
+    </div>
+
+    <div class="panel-body">
+        <form asp-action="Create" asp-controller="Home" method="post" id="addForm">
+            @Html.AntiForgeryToken()
+
+            <div class="row g-3">
+                <!-- Full Name -->
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label">
+                        <i class="bi bi-person me-1"></i>Full Name
+                    </label>
+                    <input type="text" name="FullName" class="form-control"
+                           placeholder="e.g. Juan dela Cruz" maxlength="100" required />
+                </div>
+
+                <!-- Purpose of Visit -->
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label">
+                        <i class="bi bi-clipboard2-check me-1"></i>Purpose of Visit
+                    </label>
+                    <input type="text" name="PurposeOfVisit" class="form-control"
+                           placeholder="e.g. Business Meeting" maxlength="200" required />
+                </div>
+
+                <!-- Person to Visit -->
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label">
+                        <i class="bi bi-building me-1"></i>Person to Visit
+                    </label>
+                    <input type="text" name="PersonToVisit" class="form-control"
+                           placeholder="e.g. Maria Santos" maxlength="100" required />
+                </div>
+
+                <!-- Contact Number -->
+                <div class="col-md-6 col-lg-4">
+                    <label class="form-label">
+                        <i class="bi bi-telephone me-1"></i>Contact Number
+                    </label>
+                    <input type="text" name="ContactNumber" class="form-control"
+                           placeholder="e.g. 09XX-XXX-XXXX" maxlength="20" required />
+                </div>
+
+                <!-- Buttons -->
+                <div class="col-12 d-flex align-items-end gap-2 pt-1">
+                    <button type="submit" class="btn-primary-custom">
+                        <i class="bi bi-floppy-fill"></i>
+                        Save Visitor
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            style="border-radius:8px; padding:.55rem 1rem; font-size:.85rem; font-weight:600;"
+                            onclick="clearForm()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Clear
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     BOTTOM SECTION — VISITOR TABLE
+══════════════════════════════════════════════════════ -->
+<div class="panel-card section-gap fade-up-2">
+    <div class="panel-header">
+        <div class="panel-header-icon cyan">
+            <i class="bi bi-table"></i>
+        </div>
+        <div class="flex-grow-1">
+            <h5>Visitor Log</h5>
+            <span>All registered visitor records</span>
+        </div>
+        <div class="stat-chip ms-auto">
+            <i class="bi bi-people-fill"></i>
+            @Model.Count visitor@(Model.Count != 1 ? "s" : "")
+        </div>
+    </div>
+
+    <div class="panel-body">
+        <!-- Search + Table Toolbar -->
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+            <form id="searchForm" method="get" asp-action="Index" asp-controller="Home"
+                  class="d-flex gap-2 align-items-center">
+                <div class="search-wrapper">
+                    <i class="bi bi-search"></i>
+                    <input type="text" name="search" id="searchInput"
+                           class="form-control form-control-sm"
+                           placeholder="Search visitors…"
+                           value="@search" autocomplete="off" />
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm"
+                        style="border-radius:8px; padding:.45rem .9rem; font-size:.82rem; font-weight:600; white-space:nowrap; background: linear-gradient(135deg,#1e40af,#3b82f6); border:none;">
+                    <i class="bi bi-search me-1"></i>Search
+                </button>
+                @if (!string.IsNullOrWhiteSpace(search))
+                {
+                    <a asp-action="Index" asp-controller="Home"
+                       class="btn btn-outline-secondary btn-sm"
+                       style="border-radius:8px; padding:.45rem .9rem; font-size:.82rem; font-weight:600;">
+                        <i class="bi bi-x-lg me-1"></i>Clear
+                    </a>
+                }
+            </form>
+
+            @if (!string.IsNullOrWhiteSpace(search))
+            {
+                <div style="font-size:.8rem; color:#64748b; font-weight:600;">
+                    <i class="bi bi-filter-circle me-1"></i>
+                    Results for: <strong>"@search"</strong>
+                </div>
+            }
+        </div>
+
+        <!-- TABLE -->
+        <div class="table-responsive-custom">
+            @if (Model.Count == 0)
+            {
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        @if (!string.IsNullOrWhiteSpace(search))
+                        {
+                            <i class="bi bi-search"></i>
+                        }
+                        else
+                        {
+                            <i class="bi bi-people"></i>
+                        }
+                    </div>
+                    <h6>@(string.IsNullOrWhiteSpace(search) ? "No visitors yet" : "No results found")</h6>
+                    <p>
+                        @(string.IsNullOrWhiteSpace(search)
+                            ? "Add your first visitor using the form above."
+                            : $"No visitors matched \"{search}\". Try a different keyword.")
+                    </p>
+                </div>
+            }
+            else
+            {
+                <table class="visitors-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">#</th>
+                            <th><i class="bi bi-person me-1"></i>Full Name</th>
+                            <th><i class="bi bi-clipboard2 me-1"></i>Purpose of Visit</th>
+                            <th><i class="bi bi-building me-1"></i>Person to Visit</th>
+                            <th><i class="bi bi-telephone me-1"></i>Contact</th>
+                            <th><i class="bi bi-clock me-1"></i>Date & Time</th>
+                            <th style="width:90px; text-align:center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var v in Model)
+                        {
+                            <tr class="table-row-fade">
+                                <td>
+                                    <div class="visitor-id">@v.Id</div>
+                                </td>
+                                <td>
+                                    <div class="visitor-name">@v.FullName</div>
+                                </td>
+                                <td>
+                                    <span class="badge-purpose">@v.PurposeOfVisit</span>
+                                </td>
+                                <td>
+                                    <div style="font-weight:500;">@v.PersonToVisit</div>
+                                </td>
+                                <td>
+                                    <div style="font-family: monospace; font-size:.82rem; color:#475569;">
+                                        @v.ContactNumber
+                                    </div>
+                                </td>
+                                <td>
+                                    <div style="font-size:.82rem; color:#475569; white-space:nowrap;">
+                                        <i class="bi bi-calendar3 me-1" style="color:#94a3b8;"></i>
+                                        @v.DateTimeVisited.ToString("MMM dd, yyyy")
+                                    </div>
+                                    <div style="font-size:.75rem; color:#94a3b8; white-space:nowrap;">
+                                        <i class="bi bi-clock me-1"></i>
+                                        @v.DateTimeVisited.ToString("hh:mm tt")
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1 justify-content-center">
+                                        <button type="button" class="btn-icon edit"
+                                                onclick="openEditModal(@v.Id)"
+                                                title="Edit visitor">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <button type="button" class="btn-icon delete"
+                                                onclick="confirmDelete(@v.Id, '@Html.Raw(v.FullName.Replace("'", "\\'"))')"
+                                                title="Delete visitor">
+                                            <i class="bi bi-trash3-fill"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     EDIT MODAL
+══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>Edit Visitor
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <form asp-action="Edit" asp-controller="Home" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" id="edit_Id" name="Id" />
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-person me-1"></i>Full Name</label>
+                            <input type="text" id="edit_FullName" name="FullName"
+                                   class="form-control" maxlength="100" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-clipboard2-check me-1"></i>Purpose of Visit</label>
+                            <input type="text" id="edit_Purpose" name="PurposeOfVisit"
+                                   class="form-control" maxlength="200" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-building me-1"></i>Person to Visit</label>
+                            <input type="text" id="edit_Person" name="PersonToVisit"
+                                   class="form-control" maxlength="100" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-telephone me-1"></i>Contact Number</label>
+                            <input type="text" id="edit_Contact" name="ContactNumber"
+                                   class="form-control" maxlength="20" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-calendar-event me-1"></i>Date & Time Visited</label>
+                            <input type="datetime-local" id="edit_DateTime" name="DateTimeVisited"
+                                   class="form-control" required />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm"
+                            data-bs-dismiss="modal"
+                            style="border-radius:8px; padding:.5rem 1rem; font-size:.85rem; font-weight:600;">
+                        <i class="bi bi-x-lg me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn-primary-custom btn-sm">
+                        <i class="bi bi-floppy-fill"></i>Update Visitor
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     DELETE CONFIRMATION MODAL
+══════════════════════════════════════════════════════ -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg,#7f1d1d,#dc2626); padding:.95rem 1.25rem;">
+                <h5 class="modal-title text-white" style="font-size:.9rem; font-weight:700;">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                        style="filter:brightness(0) invert(1); opacity:.8;"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <div style="width:56px;height:56px;background:#fee2e2;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;font-size:1.5rem;color:#dc2626;">
+                    <i class="bi bi-trash3-fill"></i>
+                </div>
+                <p style="font-size:.88rem; color:#374151; margin:0;">
+                    Are you sure you want to delete<br>
+                    <strong id="deleteVisitorName" style="color:#dc2626;"></strong>?
+                </p>
+                <p style="font-size:.76rem; color:#9ca3af; margin-top:.5rem;">
+                    This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer justify-content-center gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm"
+                        data-bs-dismiss="modal"
+                        style="border-radius:8px; padding:.5rem 1.2rem; font-size:.85rem; font-weight:600;">
+                    Cancel
+                </button>
+                <form id="deleteForm" asp-action="Delete" asp-controller="Home" method="post" style="display:inline;">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" id="deleteId" name="id" />
+                    <button type="button" onclick="submitDelete()"
+                            style="background:linear-gradient(135deg,#7f1d1d,#ef4444);color:#fff;border:none;border-radius:8px;padding:.5rem 1.2rem;font-size:.85rem;font-weight:700;cursor:pointer;">
+                        <i class="bi bi-trash3-fill me-1"></i>Yes, Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
